@@ -230,3 +230,34 @@ acc_test = round(accuracy_score(pred_test, y_test),2)*100
 
 print(f"\nTrain Accuracy (sklearn): {acc_train}")
 print(f"Test Accuracy (sklearn): {acc_test}")
+
+
+# https://pytorch.org/get-started/locally/#start-locally
+import torch
+import torch.nn as nn
+
+class TwoLayerNet(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(TwoLayerNet, self).__init__()
+
+        # First linear layer (input to hidden)
+        self.fc1 = nn.Linear(input_size, hidden_size)
+
+        # Activation function for the hidden layer
+        self.relu = nn.ReLU()
+
+        # Second linear layer (hidden to output)
+        self.fc2 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        # Pass input through the first linear layer
+        out = self.fc1(x)
+
+        # Apply activation function
+        out = self.relu(out)
+
+        # Pass through the second linear layer to get output
+        out = self.fc2(out)
+        return out
+
+torch_net = TwoLayerNet(13,8,1)
