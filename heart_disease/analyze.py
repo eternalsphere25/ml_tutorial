@@ -1,145 +1,15 @@
-import numpy as np
 import pandas as pd
 import warnings
+from modules.machine_learning import algorithms as algo
 from pathlib import Path
-from scipy.stats import pointbiserialr, spearmanr
 from sklearn import svm
 from sklearn.ensemble import (AdaBoostClassifier, GradientBoostingClassifier,
                               RandomForestClassifier)
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.metrics import confusion_matrix, roc_curve, roc_auc_score
-from sklearn.model_selection import cross_validate, train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
-
-
-def calculate_confusion_matrix(input_y_test, input_y_pred):
-    # Generate confusion matrix
-    cm = confusion_matrix(input_y_test, input_y_pred)
-
-    #Calculate TP/FN/FP/TN
-    tp = np.diag(cm)
-    fn = cm.sum(axis=1) - np.diag(cm)
-    fp = cm.sum(axis=0) - np.diag(cm)
-    tn = np.sum(cm) - (fp + fn + tp)
-    return cm, tp, fn, fp, tn
-
-def calculate_correlation(input_df, target_name):
-    # Calculate correlation
-    columns = input_df.columns
-    parameter = []
-    correlation = []
-    correlation_abs = []
-    for x in columns:
-        if x != target_name:
-            if len(input_df[x].unique()) <= 2:
-                r = spearmanr(input_df[target_name],input_df[x])[0]
-            else:
-                r = pointbiserialr(input_df[target_name],input_df[x])[0]
-            parameter.append(x)
-            correlation.append(r)
-            correlation_abs.append(abs(r))
-
-    # Assemble dataframe based on calculated correlation scores
-    df_param = pd.DataFrame({'parameter': parameter,
-                            'correlation': correlation,
-                            'abs_corr': correlation_abs})
-    return df_param
-
-
-def calculate_metrics(tp, fn, fp, tn):
-    # Calculate accuracy/precision/recall/F1
-    accuracy = (tp[0]+tn[0])/(tp[0]+tn[0]+fp[0]+fn[0])
-    precision = tp[0]/(tp[0]+fp[0])
-    recall = tp[0]/(tp[0]+fn[0])
-    f1 = 2*((precision*recall)/(precision+recall))
-    return accuracy, precision, recall, f1
-
-def calculate_roc_auc(input_y_test, input_y_pred):
-    fpr, tpr, threshold = roc_curve(input_y_test, input_y_pred)
-    auc = roc_auc_score(input_y_test, input_y_pred)
-    return fpr, tpr, threshold, auc
-
-def get_all_the_metrics(input_y_test, input_y_pred):
-    # Calculate confusion matrix and related statistics
-    #https://scikit-learn.org/stable/modules/
-    # model_evaluation.html#confusion-matrix
-    #https://stackoverflow.com/questions/31324218/
-    # scikit-learn-how-to-obtain-true-positive-true-negative
-    # -false-positive-and-fal
-    cm, tp, fn, fp, tn = calculate_confusion_matrix(input_y_test, input_y_pred)
-    #print(cm)
-    #print(f"True Positives: {tp[0]}")
-    #print(f"False Negatives: {fn[0]}")
-    #print(f"False Positives: {fp[0]}")
-    #print(f"True Negatives: {tn[0]}")
-
-    # Calculate metrics
-    #https://www.evidentlyai.com/classification-metrics/
-    # accuracy-precision-recall
-    #https://medium.com/analytics-vidhya/
-    # confusion-matrix-accuracy-precision-recall-f1-score-ade299cf63cd
-    #https://www.labelf.ai/blog/what-is-accuracy-precision-recall-and-f1-score
-    accuracy, precision, recall, f1 = calculate_metrics(tp, fn, fp, tn)
-    #print(f"Accuracy: {accuracy}")
-    #print(f"Precision: {precision}")
-    #print(f"Recall: {recall}")
-    #print(f"F1: {f1}")
-
-    # Calculate ROC AUC score
-    #Inputs need to be numeric
-    fpr, tpr, threshold, auc = calculate_roc_auc(input_y_test, input_y_pred)
-    #print(f"FPR: {fpr}")
-    #print(f"TPR: {tpr}")
-    #print(f"Threshold: {threshold}")
-    #print(f"AUC score: {auc}")
-    return fpr, tpr, threshold, auc, cm
-
-def print_cross_metrics(input_scores, mode, verbose=True):
-
-    def print_metric_single(metric, parameter):
-        print(f"{metric}: {parameter}")
-
-    def print_metric_average(metric, parameter):
-        print(f"{metric}: {round(parameter.mean(),2)} \u00B1 "
-              f"{round(parameter.std(),2)}")
-
-    if mode == "all":
-        print_metric_single("\nModel", input_scores["estimator"])
-        print_metric_single("Accuracy (Train)", input_scores["train_score"])
-        print_metric_single("Accuracy (Test)", input_scores["test_score"])
-        if verbose == True:
-            print_metric_single("Fit Time", input_scores["fit_time"])
-            print_metric_single("Score Time", input_scores["score_time"])
-
-    elif mode == "average":
-        print(f"\nModel: {input_scores['estimator'][0]}")
-        print_metric_average("Accuracy (Train)", input_scores["train_score"])
-        print_metric_average("Accuracy (Test)", input_scores["test_score"])
-        if verbose == True:
-            print_metric_average("Fit Time", input_scores["fit_time"])
-            print_metric_average("Score Time", input_scores["score_time"])
-
-
-
-
-def run_prediction_model(model, model_name):
-    # Train model
-    model.fit(X_train, y_train)
-
-    # Make prediction
-    y_pred = model.predict(X_test)
-
-    # Evaluate model
-    acc_train = model.score(X_train, y_train)
-    acc_test = model.score(X_test, y_test)
-    print(f"\nAccuracy on training data ({model_name}): {acc_train}")
-    print(f"Accuracy on test data ({model_name}): {acc_test}")
-    fpr, tpr, threshold, auc, cm = get_all_the_metrics(y_test, y_pred)
-    print(f"AUC ({model_name}): {auc}")
-    return acc_train, acc_test, fpr, tpr, threshold, auc, cm
 
 
 #------------------------------------------------------------------------------
@@ -290,149 +160,138 @@ print(df_data)
 
 
 #------------------------------------------------------------------------------
-# PART 3: Feature selection
+# PART 3: Run prediction models
 #------------------------------------------------------------------------------
 
 #----------------------------------------
-# PART 3-1: Split data
-#----------------------------------------
-
-# Remove target variable from the list
-col_mod = col_names.copy()
-col_mod.remove(target_val)
-
-# Split data between test and train data
-X = df_data[col_mod]
-y = df_data[target_val]
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.3, random_state=0)
-
-#----------------------------------------
-# PART 3-2: Calculate variable
-#           correlation with target
-#----------------------------------------
-
-# Add the target variable back in to calculate correlations
-df_correlation = X_train.copy()
-df_correlation[target_val] = y_train
-
-# Calculate correlation
-df_param = calculate_correlation(df_correlation, target_val)
-print(f'\nCorrelation of variable with target "{target_val}":')
-print(df_param.sort_values(by="correlation", ascending=False))
-
-
-#------------------------------------------------------------------------------
-# PART 4: Run prediction models
-#------------------------------------------------------------------------------
-
-#----------------------------------------
-# PART 4-1: Gaussian Naive Bayes
+# PART 3-1: Gaussian Naive Bayes
 #----------------------------------------
 
 # Generate classifier object
-gnb = GaussianNB()
+gnb = algo.Model(df_data, target_val, GaussianNB())
 
-# Train model and make predictions
-gnb_results = run_prediction_model(gnb, "Gaussian Naive Bayes")
-
-# Run k-fold cross validation
-scores = cross_validate(gnb, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
-
-#----------------------------------------
-# PART 4-2: Decision Tree
-#----------------------------------------
-
-# Generate object and train model
-tree = DecisionTreeClassifier(criterion="gini", max_depth=None)
-
-# Train model and make predictions
-tree_results = run_prediction_model(tree, "Decision Tree")
+# Train model, make predictions, and calculate performance metrics
+gnb.preprocess_data()
+gnb.print_correlation_metrics()
+gnb.train_model()
+gnb.evaluate_model()
+gnb.print_metrics()
 
 # Run k-fold cross validation
-scores = cross_validate(tree, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
+gnb.validate_model()
+gnb.print_cross_metrics_average()
 
 #----------------------------------------
-# PART 4-3: Random Forest
+# PART 3-2: Decision Tree
 #----------------------------------------
 
-# Generate object and train model
-rf = RandomForestClassifier()
+# Generate classifier object
+tree = algo.Model(df_data, target_val,
+                  DecisionTreeClassifier(criterion="gini", max_depth=None))
 
-# Train model and make predictions
-rf_results = run_prediction_model(rf, "Random Forest")
+# Train model, make predictions, and calculate performance metrics
+tree.preprocess_data()
+tree.print_correlation_metrics()
+tree.train_model()
+tree.evaluate_model()
+tree.print_metrics()
 
 # Run k-fold cross validation
-scores = cross_validate(rf, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
+tree.validate_model()
+tree.print_cross_metrics_average()
 
 #----------------------------------------
-# PART 4-4: Logistic Regression
+# PART 3-3: Random Forest
 #----------------------------------------
 
-# Generate object and train model
-log_reg = LogisticRegression(solver="liblinear")
+# Generate classifier object
+rf = algo.Model(df_data, target_val, RandomForestClassifier())
 
-# Train model and make predictions
-log_reg_results = run_prediction_model(log_reg, "Logistic Regression")
+# Train model, make predictions, and calculate performance metrics
+rf.preprocess_data()
+rf.print_correlation_metrics()
+rf.train_model()
+rf.evaluate_model()
+rf.print_metrics()
 
 # Run k-fold cross validation
-scores = cross_validate(log_reg, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
+rf.validate_model()
+rf.print_cross_metrics_average()
 
 #----------------------------------------
-# PART 4-5: K-Nearest Neighbors
+# PART 3-4: Logistic Regression
 #----------------------------------------
 
-# Generate object and train model
-knn = KNeighborsClassifier(n_neighbors=4)
+# Generate classifier object
+log_reg = algo.Model(df_data, target_val,
+                     LogisticRegression(solver="liblinear"))
 
-# Train model and make predictions
-knn_results = run_prediction_model(knn, "K-Nearest Neighbors")
+# Train model, make predictions, and calculate performance metrics
+log_reg.preprocess_data()
+log_reg.print_correlation_metrics()
+log_reg.train_model()
+log_reg.evaluate_model()
+log_reg.print_metrics()
 
 # Run k-fold cross validation
-scores = cross_validate(knn, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
+log_reg.validate_model()
+log_reg.print_cross_metrics_average()
+
 
 #----------------------------------------
-# PART 4-6: Support Vector Machine
+# PART 3-5: K-Nearest Neighbors
 #----------------------------------------
 
-# Generate object and train model
-s_vector = svm.SVC(kernel='linear')
+# Generate classifier object
+knn = algo.Model(df_data, target_val, KNeighborsClassifier(n_neighbors=4))
 
-# Train model and make predictions
-s_vector_results = run_prediction_model(s_vector, "Support Vector Machine")
+# Train model, make predictions, and calculate performance metrics
+knn.preprocess_data()
+knn.print_correlation_metrics()
+knn.train_model()
+knn.evaluate_model()
+knn.print_metrics()
 
 # Run k-fold cross validation
-scores = cross_validate(s_vector, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
+knn.validate_model()
+knn.print_cross_metrics_average()
 
+#----------------------------------------
+# PART 3-6: Support Vector Machine
+#----------------------------------------
+
+# Generate classifier object
+s_vector = algo.Model(df_data, target_val, svm.SVC(kernel='linear'))
+
+# Train model, make predictions, and calculate performance metrics
+s_vector.preprocess_data()
+s_vector.print_correlation_metrics()
+s_vector.train_model()
+s_vector.evaluate_model()
+s_vector.print_metrics()
+
+# Run k-fold cross validation
+s_vector.validate_model()
+s_vector.print_cross_metrics_average()
 
 #----------------------------------------
 # PART 4-7: Linear Regression
 #----------------------------------------
 
 try:
-    # Generate object and train model
-    lin_reg = LinearRegression()
+    # Generate classifier object
+    lin_reg = algo.Model(df_data, target_val, LinearRegression())
 
-    # Train model and make predictions
-    lin_reg_results = run_prediction_model(lin_reg, "Linear Regression")
+    # Train model, make predictions, and calculate performance metrics
+    lin_reg.preprocess_data()
+    lin_reg.print_correlation_metrics()
+    lin_reg.train_model()
+    lin_reg.evaluate_model()
+    lin_reg.print_metrics()
 
     # Run k-fold cross validation
-    scores = cross_validate(lin_reg, X, y, cv=10, return_estimator=True,
-                            return_train_score=True)
-    print_cross_metrics(scores, "average", verbose=False)
-
+    lin_reg.validate_model()
+    lin_reg.print_cross_metrics_average()
 except ValueError:
     print(f"\nWARNING: Linear Regression cannot be used for a mix of binary "
           f"and continuous targets!\nNOTICE: Linear Regression skipped; "
@@ -441,34 +300,38 @@ except ValueError:
 #----------------------------------------
 # PART 4-8: K-Means Clustering
 #----------------------------------------
-
 """
-# Generate object and train model
-kmeans = KMeans(n_clusters=50, n_init="auto")
+# Generate classifier object
+kmeans = algo.Model(df_data, target_val, KMeans(n_clusters=50, n_init="auto"))
 
-# Train model and make predictions
-kmeans_results = run_prediction_model(kmeans, "K-Means Clustering")
+# Train model, make predictions, and calculate performance metrics
+kmeans.preprocess_data()
+kmeans.print_correlation_metrics()
+kmeans.train_model()
+kmeans.evaluate_model()
+kmeans.print_metrics()
 
 # Run k-fold cross validation
-scores = cross_validate(kmeans, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
+kmeans.validate_model()
+kmeans.print_cross_metrics_average()
 """
-
 #----------------------------------------
 # PART 4-9: Gradient Boosting
 #----------------------------------------
 
-# Generate object and train model
-grad_boost = GradientBoostingClassifier()
+# Generate classifier object
+grad_boost = algo.Model(df_data, target_val, GradientBoostingClassifier())
 
-# Train model and make predictions
-grad_boost_results = run_prediction_model(grad_boost, "Gradient Boosting")
+# Train model, make predictions, and calculate performance metrics
+grad_boost.preprocess_data()
+grad_boost.print_correlation_metrics()
+grad_boost.train_model()
+grad_boost.evaluate_model()
+grad_boost.print_metrics()
 
 # Run k-fold cross validation
-scores = cross_validate(grad_boost, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
+grad_boost.validate_model()
+grad_boost.print_cross_metrics_average()
 
 #----------------------------------------
 # PART 4-10: Gradient Boosting (XGBoost)
@@ -477,56 +340,70 @@ print_cross_metrics(scores, "average", verbose=False)
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=FutureWarning)
 
-    # Generate object and train model
-    xg_boost = XGBClassifier(silent=True, verbosity=0)
+    # Generate classifier object
+    xg_boost = algo.Model(df_data, target_val,
+                          XGBClassifier(silent=True, verbosity=0))
 
-    # Train model and make predictions
-    xg_boost_results = run_prediction_model(xg_boost,
-                                            "Gradient Boosting (XGBoost)")
+    # Train model, make predictions, and calculate performance metrics
+    xg_boost.preprocess_data()
+    xg_boost.print_correlation_metrics()
+    xg_boost.train_model()
+    xg_boost.evaluate_model()
+    xg_boost.print_metrics()
 
     # Run k-fold cross validation
-    scores = cross_validate(xg_boost, X, y, cv=10, return_estimator=True,
-                            return_train_score=True)
-    print_cross_metrics(scores, "average", verbose=False)
+    xg_boost.validate_model()
+    xg_boost.print_cross_metrics_average()
 
 #----------------------------------------
 # PART 4-11: Gradient Boosting (AdaBoost)
 #----------------------------------------
 
-# Generate object and train model (SVM)
-ada_boost = AdaBoostClassifier(n_estimators=100)
+# Generate classifier object
+ada_boost = algo.Model(df_data, target_val,
+                       AdaBoostClassifier(n_estimators=100))
 
-# Train model and make predictions
-ada_boost_results = run_prediction_model(ada_boost,
-                                         "Gradient Boosting (AdaBoost)")
-
-# Run k-fold cross validation
-scores = cross_validate(ada_boost, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
-
-# Generate object and train model (SVM)
-ada_boost = AdaBoostClassifier(estimator=s_vector, n_estimators=100,
-                               algorithm="SAMME")
-
-# Train model and make predictions
-ada_boost_results = run_prediction_model(ada_boost,
-                                         "Gradient Boosting (AdaBoost-SVM)")
+# Train model, make predictions, and calculate performance metrics
+ada_boost.preprocess_data()
+ada_boost.print_correlation_metrics()
+ada_boost.train_model()
+ada_boost.evaluate_model()
+ada_boost.print_metrics()
 
 # Run k-fold cross validation
-scores = cross_validate(ada_boost, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
+ada_boost.validate_model()
+ada_boost.print_cross_metrics_average()
 
+# Generate classifier object
+# NOTE: For AdaBoost-SVM, a separate SVM classifier object needs to be made
+ada_boost_svm = algo.Model(
+    df_data, target_val, AdaBoostClassifier(
+        estimator=s_vector.model, n_estimators=100))
+
+# Train model, make predictions, and calculate performance metrics
+ada_boost_svm.preprocess_data()
+ada_boost_svm.print_correlation_metrics()
+ada_boost_svm.train_model()
+ada_boost_svm.evaluate_model()
+ada_boost_svm.print_metrics()
+
+# Run k-fold cross validation
+ada_boost_svm.validate_model()
+ada_boost_svm.print_cross_metrics_average()
 
 # Generate object and train model (GNB)
-ada_boost = AdaBoostClassifier(estimator=gnb, n_estimators=100)
+# NOTE: For AdaBoost-GNB, a separate GNB classifier object needs to be made
+ada_boost_gnb = algo.Model(
+    df_data, target_val, AdaBoostClassifier(
+        estimator=gnb.model, n_estimators=100))
 
-# Train model and make predictions
-ada_boost_results = run_prediction_model(ada_boost,
-                                         "Gradient Boosting (AdaBoost-GNB)")
+# Train model, make predictions, and calculate performance metrics
+ada_boost_gnb.preprocess_data()
+ada_boost_gnb.print_correlation_metrics()
+ada_boost_gnb.train_model()
+ada_boost_gnb.evaluate_model()
+ada_boost_gnb.print_metrics()
 
 # Run k-fold cross validation
-scores = cross_validate(ada_boost, X, y, cv=10, return_estimator=True,
-                        return_train_score=True)
-print_cross_metrics(scores, "average", verbose=False)
+ada_boost_gnb.validate_model()
+ada_boost_gnb.print_cross_metrics_average()
