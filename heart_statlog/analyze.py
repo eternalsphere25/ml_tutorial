@@ -8,6 +8,7 @@ https://medium.com/@pdquant/all-the-backpropagation-derivatives-d5275f727f60
 import copy
 import numpy as np
 import pandas as pd
+from modules.machine_learning import unsupervised_learning as mlu
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -72,136 +73,13 @@ print(f"Shape of test labels is {y_test.shape}")
 # PART 2: Define Neural Network
 #------------------------------------------------------------------------------
 
-class NeuralNet2:
-    def __init__(self, input_layers, learn_rate, iterations):
-        self.params = {}
-        self.learn_rate = learn_rate
-        self.iterations = iterations
-        self.loss = []
-        self.sample_size = None
-        self.layers = input_layers
-        self.X = None
-        self.y = None
-
-    def init_weights(self):
-        # Initialize weights from a random normal distribution
-        np.random.seed(1)
-        self.params['W1'] = np.random.randn(self.layers[0], self.layers[1])
-        self.params['b1'] = np.random.randn(self.layers[1])
-        self.params['W2'] = np.random.randn(self.layers[1], self.layers[2])
-        self.params['b2'] = np.random.randn(self.layers[2])
-
-    def relu(self, Z):
-        return np.maximum(0,Z)
-
-    def dRelu(self, x):
-        x[x<=0] = 0
-        x[x>0] = 1
-        return x
-
-    def sigmoid(self, Z):
-        return 1/(1+np.exp(-Z))
-
-    def tanh(self, Z):
-        return np.tanh(Z)
-
-    def eta(self, input_val):
-        eta = 0.0000000001
-        return np.maximum(input_val, eta)
-
-    def entropy_loss(self, input_y, input_y_hat):
-        n_sample = len(input_y)
-        y_inv = 1.0 - input_y
-        y_hat_inv = 1.0 - input_y_hat
-
-        # Clip values to avoid null values
-        y_hat = self.eta(input_y_hat)
-        y_hat_inv = self.eta(y_hat_inv)
-
-        # Calculate loss
-        loss = -1/n_sample * (
-            np.sum(np.multiply(np.log(y_hat), input_y)
-                   + np.multiply((y_inv), np.log(y_hat_inv))))
-        return loss
-
-    def binary_cross_entropy(self, input_y_true, input_y_pred):
-        # Small epsilon value added to clip values to prevent log(0)
-        epsilon = 1e-15
-        y_pred = np.clip(input_y_pred, epsilon, 1-epsilon)
-        loss = -(input_y_true*np.log(y_pred)+(1-input_y_true)*np.log(1-y_pred))
-        return np.mean(loss)
-
-    def categorical_cross_entropy(self, input_y_true, input_y_pred):
-        epsilon = 1e-15
-        y_pred = np.clip(input_y_pred, epsilon, 1.0)
-        loss = -np.sum(input_y_true*np.log(y_pred), axis=1)
-        return np.mean(loss)
-
-    def forward_propagation(self):
-        Z1 = self.X.dot(self.params['W1']) + self.params['b1']
-        A1 = self.relu(Z1)
-        Z2 = A1.dot(self.params['W2']) + self.params['b2']
-        y_hat = self.sigmoid(Z2)
-        loss = self.entropy_loss(self.y, y_hat)
-
-        # Save calculated parameters
-        self.params['Z1'] = Z1
-        self.params['Z2'] = Z2
-        self.params['A1'] = A1
-        return y_hat, loss
-
-    def back_propagation(self, input_y_hat):
-        y_inv = 1 - self.y
-        y_hat_inv = 1 - input_y_hat
-
-        dl_wrt_y_hat = np.divide(y_inv, self.eta(y_hat_inv)) - np.divide(
-            self.y, self.eta(input_y_hat))
-        dl_wrt_sig = input_y_hat * y_hat_inv
-        dl_wrt_z2 = dl_wrt_y_hat * dl_wrt_sig
-
-        dl_wrt_A1 = dl_wrt_z2.dot(self.params['W2'].T)
-        dl_wrt_w2 = self.params['A1'].T.dot(dl_wrt_z2)
-        dl_wrt_b2 = np.sum(dl_wrt_z2, axis=0, keepdims=True)
-
-        dl_wrt_z1 = dl_wrt_A1 * self.dRelu(self.params['Z1'])
-        dl_wrt_w1 = self.X.T.dot(dl_wrt_z1)
-        dl_wrt_b1 = np.sum(dl_wrt_z1, axis=0, keepdims=True)
-
-        # Update the weights and bias
-        self.params['W1'] = self.params['W1'] - (self.learn_rate * dl_wrt_w1)
-        self.params['W2'] = self.params['W2'] - (self.learn_rate * dl_wrt_w2)
-        self.params['b1'] = self.params['b1'] - (self.learn_rate * dl_wrt_b1)
-        self.params['b2'] = self.params['b2'] - (self.learn_rate * dl_wrt_b2)
-
-    def fit(self, input_X, input_y):
-        self.X = input_X
-        self.y = input_y
-        self.init_weights()
-
-        for i in range(self.iterations):
-            y_hat, loss = self.forward_propagation()
-            self.back_propagation(y_hat)
-            self.loss.append(loss)
-
-    def predict(self, input_X):
-        Z1 = input_X.dot(self.params['W1']) + self.params['b1']
-        A1 = self.relu(Z1)
-        Z2 = A1.dot(self.params['W2']) + self.params['b2']
-        pred = self.sigmoid(Z2)
-        return np.round(pred)
-
-    def calc_accuracy(self, input_y, input_y_hat):
-        accuracy = int(sum(input_y.flatten() == input_y_hat.flatten())
-                       / len(input_y.flatten()) * 100)
-        return accuracy
-
 
 #------------------------------------------------------------------------------
 # PART 3: Run Program
 #------------------------------------------------------------------------------
 
 layers = [13,8,1]
-neural_net = NeuralNet2(layers, 0.001, 100)
+neural_net = mlu.NeuralNet2Layer(layers, 0.001, 100)
 neural_net.fit(X_train, y_train)
 
 train_pred = neural_net.predict(X_train)
@@ -232,32 +110,56 @@ print(f"\nTrain Accuracy (sklearn): {acc_train}")
 print(f"Test Accuracy (sklearn): {acc_test}")
 
 
+
+
+
+
+
 # https://pytorch.org/get-started/locally/#start-locally
 import torch
 import torch.nn as nn
+import torch.optim as optim
+from torcheval.metrics import (
+    BinaryAccuracy,
+    BinaryPrecision,
+    BinaryRecall,
+    BinaryF1Score,
+    BinaryAUROC
+    )
 
-class TwoLayerNet(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(TwoLayerNet, self).__init__()
+# Generate model
+#model = mlu.TwoLayerNN(13,8,1)
+model = mlu.ThreeLayerNN(13, 9, 6, 1)
+print(model)
 
-        # First linear layer (input to hidden)
-        self.fc1 = nn.Linear(input_size, hidden_size)
+# Convert data to PyTorch tensor format
+X_train_tensor = model.convert_to_tensor(X_train, mode='numpy')
+X_test_tensor = model.convert_to_tensor(X_test, mode='numpy')
+y_train_tensor = model.convert_to_tensor(y_train, mode='numpy')
+y_test_tensor = model.convert_to_tensor(y_test, mode='numpy')
 
-        # Activation function for the hidden layer
-        self.relu = nn.ReLU()
+# Train model
+#criterion = nn.MSELoss()
+criterion = nn.SmoothL1Loss()
+optimizer = optim.SGD(model.parameters(), lr=0.01)
+cycles = 5000
+for epoch in range(cycles):
+    # Clear previous gradients
+    optimizer.zero_grad()
 
-        # Second linear layer (hidden to output)
-        self.fc2 = nn.Linear(hidden_size, output_size)
+    # Forward pass, calculate loss, then backward pass to compute gradients
+    outputs = model(X_train_tensor)
+    loss = criterion(outputs, y_train_tensor)
+    loss.backward()
 
-    def forward(self, x):
-        # Pass input through the first linear layer
-        out = self.fc1(x)
+    # Update weights
+    optimizer.step()
+    print(f"Epoch [{epoch +1}/{cycles}], Loss: {loss.item():.4f}")
 
-        # Apply activation function
-        out = self.relu(out)
+# Make prediction and convert output from logit to probability
+preds = model(X_test_tensor)
+preds_probs = torch.relu(preds)
 
-        # Pass through the second linear layer to get output
-        out = self.fc2(out)
-        return out
-
-torch_net = TwoLayerNet(13,8,1)
+# Evaluate model
+performance = mlu.NeuralNetPerformance(model, preds_probs, y_test_tensor)
+performance.calc_metrics()
